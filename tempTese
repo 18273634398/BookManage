@@ -1,0 +1,244 @@
+#include <iostream>
+#include <map>
+#include <string>
+#include <vector>
+#include <unistd.h>
+#include <fstream>
+
+using namespace std;
+
+ofstream outfile;
+
+// 定义图书信息的结构体
+struct Book {
+    string book_id;   // 书号
+    string name;      // 书名
+    string author;    // 著者
+    int current_stock; // 现存量
+    int total_stock;  // 总库存量
+};
+
+// B+树节点结构体
+struct BPlusTreeNode {
+    map<string, Book> books; // 用书号作为键，Book作为值
+    vector<BPlusTreeNode*> children; // 子节点指针
+    bool is_leaf; // 是否为叶子节点
+    BPlusTreeNode* next; // 指向下一个叶子节点的指针
+};
+
+// B+树类
+class BPlusTree {
+public:
+    BPlusTree(int t);
+    void insertBook(const Book& book);
+    void removeBook(const string& book_id);
+    void borrowBook(const string& book_id, const string& borrower_id, const string& return_date);
+    void returnBook(const string& book_id, const string& borrower_id);
+    void displayTree();
+
+private:
+    BPlusTreeNode* root;
+    int t; // B+树的最小度数
+    void displayTree(BPlusTreeNode* node, int depth);
+};
+
+// 构造函数
+BPlusTree::BPlusTree(int t) : t(t), root(new BPlusTreeNode()) {
+    root->is_leaf = true;
+    root->next = nullptr;
+}
+
+// 采编入库操作
+void BPlusTree::insertBook(const Book& book) {
+    // 查找是否已存在该书号的书籍
+    if (root->books.find(book.book_id) != root->books.end()) {
+        root->books[book.book_id].total_stock += book.total_stock;
+        root->books[book.book_id].current_stock += book.total_stock;
+    } else {
+        // 插入新的书籍
+        root->books[book.book_id] = book;
+    }
+    cout << "书籍 " << book.name << " 已入库。" << endl;
+    outfile<< "书籍 " << book.name << " 已入库。" << endl;
+}
+
+// 清除库存操作
+void BPlusTree::removeBook(const string& book_id) {
+    if (root->books.find(book_id) != root->books.end()) {
+        root->books.erase(book_id);
+        cout << "书号 " << book_id << " 的书籍已被清除。" << endl;
+        outfile<<"书号 " << book_id << " 的书籍已被清除。" << endl;;
+    } else {
+        cout << "未找到书号为 " << book_id << " 的书籍。" << endl;
+        outfile<< "未找到书号为 " << book_id << " 的书籍。" << endl;;
+    }
+}
+
+// 借阅操作
+void BPlusTree::borrowBook(const string& book_id, const string& borrower_id, const string& return_date) {
+    if (root->books.find(book_id) != root->books.end()) {
+        if (root->books[book_id].current_stock > 0) {
+            root->books[book_id].current_stock--;
+            cout << "书号 " << book_id << " 已借出，借阅者：" << borrower_id << "，归还期限：" << return_date << endl;
+            outfile << "书号 " << book_id << " 已借出，借阅者：" << borrower_id << "，归还期限：" << return_date << endl;
+        } else {
+            cout << "书号 " << book_id << " 的书籍已无库存。" << endl;
+            outfile <<"书号 " << book_id << " 的书籍已无库存。" << endl;
+        }
+    } else {
+        cout << "未找到书号为 " << book_id << " 的书籍。" << endl;
+        outfile << "未找到书号为 " << book_id << " 的书籍。" << endl;
+    }
+}
+
+// 归还操作
+void BPlusTree::returnBook(const string& book_id, const string& borrower_id) {
+    if (root->books.find(book_id) != root->books.end()) {
+        root->books[book_id].current_stock++;
+        cout << "书号 " << book_id << " 已归还，借阅者：" << borrower_id << endl;
+        outfile<< "书号 " << book_id << " 已归还，借阅者：" << borrower_id << endl;
+    } else {
+        cout << "未找到书号为 " << book_id << " 的书籍。" << endl;
+        outfile<< "未找到书号为 " << book_id << " 的书籍。" << endl;
+    }
+}
+
+// 显示B+树（仅为演示，简单显示）
+void BPlusTree::displayTree() {
+    displayTree(root, 0);
+}
+
+void BPlusTree::displayTree(BPlusTreeNode* node, int depth) {
+    if (node == nullptr) return;
+    for (int i = 0; i < depth; ++i) {
+        cout << "  ";
+    }
+    for (auto& book : node->books) {
+        cout << book.second.book_id << ":" << book.second.name << " ";
+        outfile<<book.second.book_id << ":" << book.second.name << " ";
+    }
+    cout << endl;
+    if (!node->is_leaf) {
+        for (auto child : node->children) {
+            displayTree(child, depth + 1);
+        }
+    }
+}
+
+
+
+// 主函数
+int main() {
+    outfile.open("D://Desktop//log.txt");
+    if (!outfile) {
+        cerr << "文件打开失败!" << endl; // cerr相较于cout能够不经过缓存直接输出 更加适合于此处的错误信息提示
+        exit(0);
+    }
+    cout<<"欢迎使用图书管理系统"<<endl<<"========================"<<endl;
+    outfile<<"欢迎使用图书管理系统"<<endl<<"========================"<<endl;
+    cout<<"[1]记录新购入图书"<<endl<<"[2]清除指定图书库存"<<endl<<"[3]借阅图书"<<endl<<"[4]归还图书"<<endl<<"[5]以凹入表显示图书资源信息"<<endl<<"------------------------"<<endl<<"请输入功能选项：";
+    outfile<<"[1]记录新购入图书"<<endl<<"[2]清除指定图书库存"<<endl<<"[3]借阅图书"<<endl<<"[4]归还图书"<<endl<<"[5]以凹入表显示图书资源信息"<<endl<<"------------------------"<<endl<<"请输入功能选项：";
+    int choice;
+    cin >> choice;
+    outfile<<choice<<endl;
+    if (cin.fail()) {
+        cout << "[Error 1] 选项输入异常，系统已结束运行" << endl;
+        outfile<<"[Error 1] 选项输入异常，系统已结束运行" << endl;;
+        exit(0);  // 退出程序
+    }
+    BPlusTree bpt(3);
+    while(choice) {
+        if(choice == 1) {
+            string id,bookName,author;
+            int num;
+            cout<<"请输入新购入书籍的相关信息"<<endl<<"========================"<<endl;
+            outfile<<"请输入新购入书籍的相关信息"<<endl<<"========================"<<endl;
+            cout<<"请输入书号：";
+            outfile<<"请输入书号：";
+            cin>>id;
+            outfile<<id<<endl;
+            cout<<"请输入书籍名：";
+            outfile<<"请输入书籍名：";
+            cin>>bookName;
+            outfile<<bookName<<endl;
+            cout<<"请输入作者：";
+            outfile<<"请输入作者：";
+            cin>>author;
+            outfile<<author<<endl;
+            cout<<"请输入新增图书量：";
+            outfile<<"请输入新增图书量：";
+            cin>>num;
+            outfile<<num<<endl;
+            Book book = {id,bookName,author,num,num};
+            bpt.insertBook(book);
+        }
+        else if(choice==2) {
+            string id;
+            cout<<"请输入书号：";
+            outfile<<"请输入书号：";
+            cin>>id;
+            outfile<<id<<endl;
+            bpt.removeBook(id);
+        }
+        else if(choice==3 || choice==5) {
+            string id,borrowerId,returnDate,reviewDate;
+            cout<<"请输入借阅图书的编号：";
+            outfile<<"请输入借阅图书的编号：";
+            cin>>id;
+            outfile<<id<<endl;
+            cout<<"请输入借阅账号：";
+            outfile<<"请输入借阅账号：";
+            cin>>borrowerId;
+            outfile<<borrowerId<<endl;
+            cout<<"请输入预约取书时间：";
+            outfile<<"请输入预约取书时间：";
+            cin>>reviewDate;
+            outfile<<reviewDate<<endl;
+            cout<<"请输入归还时间：";
+            outfile<<"请输入归还时间：";
+            cin>>returnDate;
+            outfile<<returnDate<<endl;
+            bpt.borrowBook(id,borrowerId,returnDate);
+            if(choice==5) {
+                cout<<"请与"<<reviewDate<<"前，前往本馆借取藏书，到期将自动释放图书资源";
+                outfile<<"请与"<<reviewDate<<"前，前往本馆借取藏书，到期将自动释放图书资源";
+            }
+        }
+        else if(choice==4) {
+            string id,borrowerId;
+            cout<<"请输入借阅图书的编号：";
+            outfile<<"请输入借阅图书的编号：";
+            cin>>id;
+            outfile<<id<<endl;
+            cout<<"请输入借阅账号：";
+            outfile<<"请输入借阅账号：";
+            cin>>borrowerId;
+            outfile<<borrowerId<<endl;
+            bpt.returnBook(id,borrowerId);
+        }
+        else if(choice==6) {
+            bpt.displayTree();
+        }
+        else {
+            cout << "[Error 2] 功能选项输入错误，请重试" << endl;
+        }
+        usleep(500000);
+        cout<<"[Finish] Operation Finished"<<endl;
+        usleep(1500000);
+        cout<<endl<<endl<<endl;
+        outfile<<"[Finish] Operation Finished"<<endl<<endl<<endl<<endl;
+        cout<<"======================="<<endl;
+        cout<<"[1]记录新购入图书"<<endl<<"[2]清除指定图书库存"<<endl<<"[3]借阅图书"<<endl<<"[4]归还图书"<<endl<<"[5]预约图书"<<endl<<"[6]以凹入表显示图书资源信息"<<endl<<"------------------------"<<endl<<"请输入功能选项：";
+        outfile<<"======================="<<endl<<"[1]记录新购入图书"<<endl<<"[2]清除指定图书库存"<<endl<<"[3]借阅图书"<<endl<<"[4]归还图书"<<endl<<"[5]预约图书"<<endl<<"[6]以凹入表显示图书资源信息"<<endl<<"------------------------"<<endl<<"请输入功能选项：";
+        cin>>choice;
+        outfile<<choice;
+        if (cin.fail()) {
+            cout << "[Error 1] 选项输入异常，系统已结束运行" << endl;
+            outfile<<"[Error 1] 选项输入异常，系统已结束运行" << endl;
+            exit(0);  // 退出程序
+        }
+    }
+    outfile.close();
+    return 0;
+}
+
